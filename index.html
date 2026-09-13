@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JY Love</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{
+    background:radial-gradient(ellipse at 50% 42%,#2b0a36 0%,#160422 45%,#050109 100%);
+    font-family:"Microsoft YaHei",sans-serif;
+    user-select:none;
+}
+
+/* 左侧滚动代码面板 */
+#codePanel{
+    position:fixed;
+    top:0;left:0;bottom:0;
+    width:46%;
+    z-index:0;
+    overflow:hidden;
+    background:linear-gradient(90deg,rgba(8,6,18,.9) 0%,rgba(8,6,18,.8) 65%,rgba(8,6,18,0) 100%);
+    font-family:Consolas,"Courier New",monospace;
+    font-size:15px;
+    line-height:1.55;
+    color:#cdd5e4;
+    padding:12px 0;
+}
+#codeScroll{will-change:transform;animation:codeScrollUp linear infinite}
+@keyframes codeScrollUp{
+    from{transform:translateY(0)}
+    to{transform:translateY(-50%)}
+}
+.cline{display:flex;white-space:pre;padding-right:20px}
+.cline .ln{
+    flex:none;
+    width:2.6em;
+    text-align:right;
+    margin-right:16px;
+    color:#585d78;
+    user-select:none;
+}
+.cline .kw{color:#7aa2ff}
+.cline .fn{color:#c792ea}
+.cline .num{color:#f7a35c}
+.cline .cm{color:#5c6370;font-style:italic}
+
+/* 星光 */
+#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+.star{
+    position:absolute;
+    background:#fff;
+    border-radius:50%;
+    box-shadow:0 0 6px rgba(255,255,255,.8);
+    animation:twinkle ease-in-out infinite;
+}
+@keyframes twinkle{
+    0%,100%{opacity:.12}
+    50%{opacity:.9}
+}
+
+/* 漂浮光斑(焦外光点) */
+#bokeh{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.bok{
+    position:absolute;
+    top:100%;
+    border-radius:50%;
+    animation:bokRise linear infinite;
+}
+@keyframes bokRise{
+    0%{transform:translate(0,12vh);opacity:0}
+    10%{opacity:var(--o)}
+    88%{opacity:var(--o)}
+    100%{transform:translate(var(--dx),-112vh);opacity:0}
+}
+
+/* 爱心背后的柔光 */
+#heartGlow{
+    position:fixed;
+    left:50%;top:39%;
+    width:320px;
+    height:320px;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:radial-gradient(circle,rgba(255,0,150,.13),transparent 65%);
+    filter:blur(35px);
+    z-index:1;
+    pointer-events:none;
+}
+/* 底部地面光晕 */
+#floorGlow{
+    position:fixed;
+    left:50%;bottom:-7vh;
+    width:95vmin;height:26vmin;
+    transform:translateX(-50%);
+    background:radial-gradient(ellipse at center,rgba(255,70,160,.35) 0%,rgba(180,50,200,.15) 45%,rgba(180,50,200,0) 70%);
+    z-index:2;
+    animation:glowBreath 3.4s ease-in-out infinite reverse;
+    pointer-events:none;
+}
+@keyframes glowBreath{
+    50%{opacity:.7;transform:translate(-50%,-50%) scale(1.07)}
+}
+
+/* 爱心粒子画布 */
+canvas#heart{position:fixed;top:0;left:0;z-index:3}
+
+/* 蛇形光束画布 */
+canvas#beamCanvas{position:fixed;top:0;left:0;z-index:2;pointer-events:none}
+
+/* 飞升照片画布 */
+canvas#photoCanvas{position:fixed;top:0;left:0;z-index:2;pointer-events:none}
+
+/* 粒子旋涡画布 */
+canvas#vortexCanvas{position:fixed;top:0;left:0;z-index:2;pointer-events:none}
+
+/* 漂浮玫瑰 */
+.rose{
+    position:absolute;
+    bottom:-14vh;
+    z-index:4;
+    animation:roseRise linear infinite;
+    pointer-events:none;
+}
+.rose span{
+    display:block;
+    filter:drop-shadow(0 0 10px rgba(255,70,110,.5));
+    animation:roseSway ease-in-out infinite alternate;
+}
+.rose b{
+    display:inline-block;
+    transform:scale(1,1); /* 细长玫瑰 */
+}
+@keyframes roseRise{
+    0%{transform:translateY(0) rotate(0deg);opacity:0}
+    6%{opacity:.95}
+    90%{opacity:.9}
+    100%{transform:translateY(-130vh) rotate(var(--rot));opacity:0}
+}
+@keyframes roseSway{
+    from{transform:translateX(-12px) rotate(-7deg)}
+    to{transform:translateX(12px) rotate(9deg)}
+}
+
+/* 开场倒计时文字遮罩层(参考 文字效果.mp4) */
+#intro{
+    position:fixed;
+    inset:0;
+    z-index:99;
+    background:#000;
+    transition:opacity .8s ease;
+}
+#intro.hide{opacity:0;pointer-events:none}
+#introRain{position:absolute;inset:0;width:100%;height:100%}
+</style>
+</head>
+<body>
+
+<div id="codePanel"><div id="codeScroll"></div></div>
+<div id="stars"></div>
+<div id="bokeh"></div>
+<div id="heartGlow"></div>
+<div id="floorGlow"></div>
+<canvas id="beamCanvas"></canvas>
+<canvas id="photoCanvas"></canvas>
+<canvas id="vortexCanvas"></canvas>
+<canvas id="heart"></canvas>
+
+<div id="intro">
+    <canvas id="introRain"></canvas>
+</div>
+
+<script>
+// ============ 开场倒计时 + 文字展示(参考 文字效果.mp4) ============
+(function(){
+    const intro=document.getElementById("intro");
+    const rain=document.getElementById("introRain");
+    const ctx=rain.getContext("2d");
+    let W,H,rainRAF;
+
+    // 粉色代码雨背景
+    const CHARS="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz{}[]()<>=+-*/;:,.#$%&|";
+    const FONT=20;
+    let cols=[];
+    function initRain(){
+        cols=[];
+        const n=Math.ceil(W/FONT);
+        for(let i=0;i<n;i++){
+            cols.push({
+                x:i*FONT,
+                y:Math.random()*H*2-H,
+                speed:2+Math.random()*4.5,
+                len:12+(Math.random()*20|0),
+                o:0.25+Math.random()*0.55
+            });
+        }
+    }
+    function resize(){
+        W=rain.width=innerWidth;
+        H=rain.height=innerHeight;
+        initRain();
+    }
+    resize();
+    addEventListener("resize",resize);
+
+    function rainFrame(){
+        rainRAF=requestAnimationFrame(rainFrame);
+        ctx.fillStyle="rgba(0,0,0,0.22)";
+        ctx.fillRect(0,0,W,H);
+        ctx.font="bold "+FONT+"px monospace";
+        for(const c of cols){
+            c.y+=c.speed;
+            if(c.y-c.len*FONT>H)c.y=-Math.random()*200;
+            for(let j=0;j<c.len;j++){
+                const y=c.y-j*FONT;
+                if(y<-20||y>H+20)continue;
+                const a=c.o*(1-j/c.len);
+                ctx.fillStyle=j===0?"rgba(255,210,240,"+Math.min(1,a*2)+")":"rgba(255,60,170,"+a+")";
+                ctx.fillText(CHARS[(Math.random()*CHARS.length)|0],c.x,y);
+            }
+        }
+        drawParticles();
+    }
+
+    // ---- 粒子文字:采样字形点位,粒子从四周汇聚成字再散开 ----
+    let particles=[];
+    let pT0=0,pDur=0;
+    const IN_DUR=480,OUT_DUR=450;
+
+    rainFrame();
+
+    function sampleText(text){
+        let fs=Math.max(66,Math.min(Math.min(W,H)*0.225,240));
+        const oc=document.createElement("canvas");
+        oc.width=W;
+        oc.height=Math.max(120,Math.ceil(fs*1.6));
+        const oq=oc.getContext("2d");
+        oq.font="bold "+fs+"px 'Microsoft YaHei',sans-serif";
+        // 文字过宽时按比例缩小,防止超出屏幕
+        const tw=oq.measureText(text).width;
+        if(tw>W*0.92){
+            fs=fs*(W*0.92)/tw;
+            oc.height=Math.max(120,Math.ceil(fs*1.6));
+            oq.font="bold "+fs+"px 'Microsoft YaHei',sans-serif";
+        }
+        oq.textAlign="center";
+        oq.textBaseline="middle";
+        oq.fillStyle="#fff";
+        oq.fillText(text,W/2,oc.height/2);
+        const data=oq.getImageData(0,0,W,oc.height).data;
+        const pts=[];
+        const grid=4; // 采样间隔,越小粒子越密
+        for(let y=0;y<oc.height;y+=grid){
+            for(let x=0;x<W;x+=grid){
+                if(data[(y*W+x)*4+3]>128){
+                    pts.push({x:x,y:y+(H-oc.height)/2});
+                }
+            }
+        }
+        return pts;
+    }
+
+    function startParticleText(text,dur){
+        const pts=sampleText(text);
+        pT0=performance.now();
+        pDur=dur;
+        particles=pts.map(function(t){
+            const ang=Math.random()*Math.PI*2;
+            const dist=120+Math.random()*Math.max(W,H)*0.5;
+            return {
+                tx:t.x,ty:t.y,
+                sx:t.x+Math.cos(ang)*dist,
+                sy:t.y+Math.sin(ang)*dist,
+                dx:Math.cos(ang)*(60+Math.random()*160), // 散开方向
+                dy:Math.sin(ang)*(60+Math.random()*160)-50,
+                delay:Math.random()*Math.min(260,dur*0.2),
+                size:1+Math.random()*1.4,
+                tw:2+Math.random()*4,
+                ph:Math.random()*Math.PI*2,
+                w:Math.random()<0.14 // 少量白色亮点
+            };
+        });
+    }
+
+    function drawParticles(){
+        if(!particles.length)return;
+        const now=performance.now();
+        const t=now-pT0;
+        // 汇聚/散开时长随本步总时长按比例缩放,避免短步骤动画未完成
+        const inDur=Math.min(IN_DUR,pDur*0.42);
+        const outDur=Math.min(OUT_DUR,pDur*0.35);
+        const outStart=pDur-outDur;
+        for(const p of particles){
+            let x,y,a;
+            if(t<inDur+p.delay){
+                // 汇聚:从随机位置缓动飞向目标点
+                const q=Math.max(0,(t-p.delay)/inDur);
+                const e=1-Math.pow(1-q,3);
+                x=p.sx+(p.tx-p.sx)*e;
+                y=p.sy+(p.ty-p.sy)*e;
+                a=0.15+0.85*q;
+            }else if(t<outStart){
+                // 驻留:目标点轻微抖动+闪烁
+                x=p.tx+Math.sin(now/260+p.ph)*0.7;
+                y=p.ty+Math.cos(now/300+p.ph)*0.7;
+                a=0.7+0.3*Math.sin(now/1000*p.tw+p.ph);
+            }else{
+                // 散开:向四周飘散淡出
+                const q=Math.min(1,(t-outStart)/outDur);
+                const e=q*q*(3-2*q);
+                x=p.tx+p.dx*e;
+                y=p.ty+p.dy*e;
+                a=1-q;
+            }
+            if(a<=0.02)continue;
+            ctx.fillStyle=p.w?"rgba(255,235,250,"+a+")":"rgba(255,60,180,"+a+")";
+            ctx.fillRect(x-p.size/2,y-p.size/2,p.size,p.size);
+        }
+        if(t>pDur)particles=[];
+    }
+
+    // 倒计时 3→2→1,再逐句展示文字
+    const steps=[["3",900],["2",900],["1",900],["JY",2000],["祝你",2000],["天天开心",2000]];
+    let idx=0;
+    function next(){
+        if(idx>=steps.length){finish();return}
+        const s=steps[idx++];
+        startParticleText(s[0],s[1]);
+        setTimeout(next,s[1]);
+    }
+    // 结束后遮罩层淡出移除,展示当前页面效果
+    function finish(){
+        intro.classList.add("hide");
+        cancelAnimationFrame(rainRAF);
+        setTimeout(function(){intro.remove()},900);
+    }
+    setTimeout(next,400);
+})();
+
+// ============ 左侧滚动代码 ============
+(function(){
+    const codeLines=[
+"/* Matrix44 矩阵运算 */",
+"Matrix44.createIdentity = function () {",
+"    return new Float32Array([1,0,0,0, 0,1,0,0,",
+"        0,0,1,0, 0,0,0,1]);",
+"};",
+"",
+"Matrix44.loadProjection = function (m, aspect, vdeg, near, far) {",
+"    var h = near * Math.tan(vdeg * Math.PI / 180.0 * 0.5) * 2.0;",
+"    var w = h * aspect;",
+"",
+"    m[0] = 2.0 * near / w;",
+"    m[1] = 0.0;",
+"    m[2] = 0.0;",
+"    m[3] = 0.0;",
+"",
+"    m[4] = 0.0;",
+"    m[5] = 2.0 * near / h;",
+"    m[6] = 0.0;",
+"    m[7] = 0.0;",
+"",
+"    m[8] = 0.0;",
+"    m[9] = 0.0;",
+"    m[10] = -(far + near) / (far - near);",
+"    m[11] = -1.0;",
+"",
+"    m[12] = 0.0;",
+"    m[13] = 0.0;",
+"    m[14] = -2.0 * far * near / (far - near);",
+"    m[15] = 0.0;",
+"    return m;",
+"};",
+"",
+"Matrix44.lookAt = function (m, vpos, vlook, vup) {",
+"    var frontV = Vector3.create(",
+"        vpos.x - vlook.x, vpos.y - vlook.y, vpos.z - vlook.z);",
+"    Vector3.normalize(frontV);",
+"",
+"    var sideV = Vector3.cross(frontV, vup);",
+"    Vector3.normalize(sideV);",
+"",
+"    var topV = Vector3.cross(sideV, frontV);",
+"    Vector3.normalize(topV);",
+"",
+"    m[0] = sideV.x;  m[1] = topV.x;  m[2] = frontV.x;  m[3] = 0;",
+"    m[4] = sideV.y;  m[5] = topV.y;  m[6] = frontV.y;  m[7] = 0;",
+"    m[8] = sideV.z;  m[9] = topV.z;  m[10] = frontV.z; m[11] = 0;",
+"",
+"    m[12] = -Vector3.dot(sideV, vpos);",
+"    m[13] = -Vector3.dot(topV, vpos);",
+"    m[14] = -Vector3.dot(frontV, vpos);",
+"    m[15] = 1;",
+"    return m;",
+"};",
+"",
+"/* 渲染目标配置 */",
+"var gl;",
+"var renderSpec = {",
+"    width: 0, height: 0, aspect: 1,",
+"    array: new Float32Array(3)",
+"};",
+"renderSpec.setSize = function(w, h) {",
+"    renderSpec.width = w;",
+"    renderSpec.height = h;",
+"    renderSpec.aspect = w / h;",
+"    renderSpec.array[0] = renderSpec.aspect;",
+"    renderSpec.array[1] = w;",
+"    renderSpec.array[2] = h;",
+"};",
+"",
+"function getRandomTarget() {",
+"    return Math.random() * 0.5 + 0.5;",
+"}",
+"",
+"/* WebGL 帧缓冲 */",
+"function createRenderTarget() {",
+"    var framebuffer = gl.createFramebuffer();",
+"    var renderbuffer = gl.createRenderbuffer();",
+"    var texture = gl.createTexture();",
+"",
+"    gl.bindTexture(gl.TEXTURE_2D, texture);",
+"    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,",
+"        renderSpec.width, renderSpec.height, 0,",
+"        gl.RGBA, gl.UNSIGNED_BYTE, null);",
+"    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);",
+"    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);",
+"",
+"    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);",
+"    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,",
+"        gl.TEXTURE_2D, texture, 0);",
+"    return framebuffer;",
+"}",
+"",
+"/* 着色器编译 */",
+"function compileShader(vtxsrc, frgsrc) {",
+"    var shader = gl.createShader(gl.VERTEX_SHADER);",
+"    gl.shaderSource(shader, vtxsrc);",
+"    gl.compileShader(shader);",
+"    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {",
+"        console.log(gl.getShaderInfoLog(shader));",
+"        return null;",
+"    }",
+"    return shader;",
+"}",
+"",
+"function useShader(prog) {",
+"    gl.useProgram(prog);",
+"    for (var i = 0; i < uniformList.length; i++) {",
+"        uniforms[uniformList[i]] =",
+"            gl.getUniformLocation(prog, uniformList[i]);",
+"    }",
+"    for (var j = 0; j < attrList.length; j++) {",
+"        attributes[attrList[j]] =",
+"            gl.getAttribLocation(prog, attrList[j]);",
+"        gl.enableVertexAttribArray(attributes[attrList[j]]);",
+"    }",
+"}",
+"",
+"/* 粒子花瓣 */",
+"var pointFlower;",
+"var meshFlower;",
+"var sceneStandBy;",
+"",
+"function BlossomParticle() {",
+"    this.velocity = Vector3.create(0, 0, 0);",
+"    this.rotation = Vector3.create(0, 0, 0);",
+"    this.position = Vector3.create(0, 0, 0);",
+"    this.euler = Vector3.create(0, 0, 0);",
+"    this.size = 1.0;",
+"    this.alpha = 1.0;",
+"    this.zkey = 0.0;",
+"}",
+"",
+"BlossomParticle.prototype.setVelocity = function (vx, vy, vz) {",
+"    this.velocity.x = vx;",
+"    this.velocity.y = vy;",
+"    this.velocity.z = vz;",
+"};",
+"",
+"BlossomParticle.prototype.setRotation = function (rx, ry, rz) {",
+"    this.rotation.x = rx;",
+"    this.rotation.y = ry;",
+"    this.rotation.z = rz;",
+"};",
+"",
+"BlossomParticle.prototype.update = function (dt) {",
+"    this.position.x += this.velocity.x * dt;",
+"    this.position.y += this.velocity.y * dt;",
+"    this.position.z += this.velocity.z * dt;",
+"    this.euler.x += this.rotation.x * dt;",
+"    this.euler.y += this.rotation.y * dt;",
+"    this.euler.z += this.rotation.z * dt;",
+"    this.alpha -= dt * 0.3;",
+"};",
+"",
+"function initPointFlowers() {",
+"    pointFlower = new ShaderProgram();",
+"    pointFlower.numFlowers = 1600;",
+"    pointFlower.particles =",
+"        new Array(pointFlower.numFlowers);",
+"    for (var i = 0; i < pointFlower.numFlowers; i++) {",
+"        pointFlower.particles[i] = new BlossomParticle();",
+"    }",
+"}"
+    ];
+
+    function escapeHtml(s){
+        return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+    // 简易语法高亮
+    function highlight(s){
+        let h=escapeHtml(s);
+        if(h.trim().startsWith("/*")||h.trim().startsWith("*")){return '<span class="cm">'+h+"</span>"}
+        h=h.replace(/\b(function|var|return|new|for|if|this|prototype|null)\b/g,'<span class="kw">$1</span>');
+        h=h.replace(/\b(\d+\.?\d*)\b/g,'<span class="num">$1</span>');
+        return h;
+    }
+    function buildBlock(startNo){
+        let html="";
+        for(let i=0;i<codeLines.length;i++){
+            html+='<div class="cline"><span class="ln">'+(startNo+i)+'</span><span>'+highlight(codeLines[i])+"</span></div>";
+        }
+        return html;
+    }
+    const scroll=document.getElementById("codeScroll");
+    // 内容复制两份实现无缝循环,行号连续
+    scroll.innerHTML=buildBlock(342)+buildBlock(342+codeLines.length);
+    // 滚动速度:约每秒 10 行,缓慢滚动
+    scroll.style.animationDuration=(codeLines.length/10)+"s";
+})();
+
+// ============ 背景星光 ============ 
+(function(){
+    const box=document.getElementById("stars");
+    for(let i=0;i<140;i++){
+        const s=document.createElement("div");
+        s.className="star";
+        const size=(0.8+Math.random()*2.2).toFixed(1);
+        s.style.width=size+"px";
+        s.style.height=size+"px";
+        s.style.left=Math.random()*100+"%";
+        s.style.top=Math.random()*100+"%";
+        s.style.animationDuration=(1.6+Math.random()*3.4)+"s";
+        s.style.animationDelay=(-Math.random()*4)+"s";
+        box.appendChild(s);
+    }
+})();
+
+// ============ 漂浮光斑 ============
+(function(){
+    const box=document.getElementById("bokeh");
+    const colors=[
+        "rgba(255,105,180,.85)",
+        "rgba(186,85,255,.8)",
+        "rgba(255,182,233,.85)",
+        "rgba(147,112,219,.8)",
+        "rgba(255,235,245,.9)"
+    ];
+    for(let i=0;i<26;i++){
+        const b=document.createElement("div");
+        b.className="bok";
+        const size=4+Math.random()*14;
+        const c=colors[(Math.random()*colors.length)|0];
+        b.style.width=size+"px";
+        b.style.height=size+"px";
+        b.style.left=Math.random()*100+"%";
+        b.style.background="radial-gradient(circle,"+c+" 0%,rgba(255,255,255,0) 70%)";
+        b.style.setProperty("--o",(0.18+Math.random()*0.35).toFixed(2));
+        b.style.setProperty("--dx",((Math.random()-.5)*20)+"vw");
+        const dur=13+Math.random()*15;
+        b.style.animationDuration=dur+"s";
+        b.style.animationDelay=(-Math.random()*dur)+"s";
+        box.appendChild(b);
+    }
+})();
+
+// ============ 蛇形光束(上粗下细,像蛇一样随机游荡) ============
+// (function(){
+//     const canvas=document.getElementById("beamCanvas");
+//     const ctx=canvas.getContext("2d");
+//     const DPR=Math.min(window.devicePixelRatio||1,2);
+//     let W,H;
+//     function resize(){
+//         W=canvas.width=Math.floor(innerWidth*DPR);
+//         H=canvas.height=Math.floor(innerHeight*DPR);
+//         canvas.style.width=innerWidth+"px";
+//         canvas.style.height=innerHeight+"px";
+//     }
+//     resize();
+//     addEventListener("resize",resize);
+
+//     const COLORS=[[255,255,255],[255,225,248],[215,185,255],[255,195,238]];
+//     const SEG=26;   // 每条蛇的分段数
+//     const beams=[];
+
+//     function reset(b,init){
+//         b.x=Math.random()*W;
+//         b.len=(0.28+Math.random()*0.38)*H;          // 身体长度
+//         b.vy=(0.14+Math.random()*0.16)*H;           // 上升速度 px/s
+//         b.wTop=(2.5+Math.random()*3)*DPR;           // 上端(头部)粗度
+//         b.a=0.5+Math.random()*0.4;
+//         b.s1=Math.random()*6.28;                    // 随机游动相位
+//         b.s2=Math.random()*6.28;
+//         b.s3=Math.random()*6.28;
+//         b.color=COLORS[(Math.random()*COLORS.length)|0];
+//         // init:首帧铺满屏幕;之后从屏幕下方重新进入
+//         b.headY=init?Math.random()*H*1.4-H*0.2:H+b.len*(0.2+Math.random()*0.8);
+//     }
+//     for(let i=0;i<14;i++){const b={};reset(b,true);beams.push(b);}
+
+//     let last=performance.now();
+//     function frame(now){
+//         requestAnimationFrame(frame);
+//         let dt=(now-last)/1000;
+//         last=now;
+//         if(dt>0.05)dt=0.05;
+//         const time=now/1000;
+//         ctx.clearRect(0,0,W,H);
+//         ctx.globalCompositeOperation="lighter";
+//         ctx.lineCap="round";
+
+//         for(const b of beams){
+//             b.headY-=b.vy*dt;
+//             if(b.headY+b.len<-60)reset(b,false); // 整条飞出顶部后重生
+
+//             let px=0,py=0;
+//             for(let i=0;i<=SEG;i++){
+//                 const s=i/SEG; // 0=头部(上端) 1=尾部(下端)
+//                 // 多重正弦叠加=随机蛇形游荡,头部摆幅更大
+//                 const wander=0.45+0.55*(1-s);
+//                 const sway=(Math.sin(s*4+time*1.4+b.s1)*22
+//                           +Math.sin(s*9-time*2.2+b.s2)*10
+//                           +Math.sin(time*0.8+b.s3)*14)*wander*DPR;
+//                 const nx=b.x+sway;
+//                 const ny=b.headY+s*b.len;
+//                 if(i>0){
+//                     // 上粗下细的锥形身体
+//                     const w=b.wTop*Math.pow(1-s,1.25)+0.5*DPR;
+//                     let al=b.a*Math.pow(1-s,0.75); // 尾部渐淡消散
+//                     if(s<0.06)al*=s/0.06;          // 头顶尖端微淡
+//                     const c=b.color;
+//                     // 外层光晕
+//                     ctx.strokeStyle="rgba("+c[0]+","+c[1]+","+c[2]+","+(al*0.25)+")";
+//                     ctx.lineWidth=w*2.6;
+//                     ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(nx,ny);ctx.stroke();
+//                     // 亮核心
+//                     ctx.strokeStyle="rgba("+c[0]+","+c[1]+","+c[2]+","+al+")";
+//                     ctx.lineWidth=w;
+//                     ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(nx,ny);ctx.stroke();
+//                 }
+//                 px=nx;py=ny;
+//             }
+//         }
+//     }
+//     requestAnimationFrame(frame);
+// })();
+
+// ============ 照片飞升(img 文件夹缩略图循环上升) ============
+(function(){
+    const canvas=document.getElementById("photoCanvas");
+    const ctx=canvas.getContext("2d");
+    const DPR=Math.min(window.devicePixelRatio||1,2);
+    let W,H;
+    function resize(){
+        W=canvas.width=Math.floor(innerWidth*DPR);
+        H=canvas.height=Math.floor(innerHeight*DPR);
+        canvas.style.width=innerWidth+"px";
+        canvas.style.height=innerHeight+"px";
+    }
+    resize();
+    addEventListener("resize",resize);
+
+    // 加载 img 文件夹下全部图片(15 为 png,其余 jpg)
+    const images=[];
+    for(let i=1;i<=7;i++){
+        const img=new Image();
+        img.src="img/"+i+(i===15?".png":".jpg");
+        images.push(img);
+    }
+    function readyImages(){
+        return images.filter(im=>im.complete&&im.naturalWidth>0);
+    }
+
+    const flyers=[];
+    const COUNT=14;
+    function reset(p,init){
+        const ready=readyImages();
+        if(!ready.length){p.img=null;return}
+        p.img=ready[(Math.random()*ready.length)|0];
+        // 等分车道:每张照片只在自己的车道内移动,上升时互不遮挡
+        const laneW=W/COUNT;
+        p.x=laneW*(p.lane+0.5);
+        p.size=Math.min((52+Math.random()*46)*DPR,laneW*0.86); // 缩略图尺寸
+        p.vy=(0.05+Math.random()*0.06)*H;           // 上升速度 px/s
+        const room=Math.max(0,laneW/2-p.size/2);
+        p.swayA=Math.min((18+Math.random()*28)*DPR,room); // 摆动幅度限制在车道内
+        p.swayW=0.4+Math.random()*0.6;
+        p.rotA=(4+Math.random()*6)*Math.PI/180;     // 摆动角度
+        p.ph=Math.random()*6.28;
+        // init:首帧铺满屏幕;之后从屏幕下方重新进入
+        p.y=init?Math.random()*(H+p.size*2)-p.size:H+p.size*(1+Math.random()*1.5);
+    }
+    for(let i=0;i<COUNT;i++){const p={lane:i};reset(p,true);flyers.push(p);}
+
+    let last=performance.now();
+    function frame(now){
+        requestAnimationFrame(frame);
+        let dt=(now-last)/1000;
+        last=now;
+        if(dt>0.05)dt=0.05;
+        const time=now/1000;
+        ctx.clearRect(0,0,W,H);
+
+        for(const p of flyers){
+            if(!p.img){reset(p,true);continue}
+            p.y-=p.vy*dt;
+            if(p.y<-p.size*1.5)reset(p,false); // 飞出顶部后重生
+
+            const sway=Math.sin(time*p.swayW+p.ph)*p.swayA;
+            const rot=Math.sin(time*p.swayW*0.8+p.ph)*p.rotA;
+            const px=p.x+sway;
+
+            // 出入屏幕时淡入淡出
+            let al=1;
+            if(p.y<H+p.size&&p.y>H-p.size*0.5){
+                al=Math.max(0,(H+p.size-p.y)/(p.size*1.5));
+            }
+            if(p.y<p.size*1.2)al=Math.min(al,Math.max(0,p.y/(p.size*1.2)));
+            if(al<=0.01)continue;
+
+            const iw=p.img.naturalWidth,ih=p.img.naturalHeight;
+            const scale=Math.max(p.size/iw,p.size/ih); // 裁切填充
+            const dw=iw*scale,dh=ih*scale;
+
+            ctx.save();
+            ctx.translate(px,p.y);
+            ctx.rotate(rot);
+            ctx.globalAlpha=al*0.95;
+            ctx.drawImage(p.img,-dw/2,-dh/2,dw,dh);
+            ctx.restore();
+        }
+        ctx.globalAlpha=1;
+    }
+    requestAnimationFrame(frame);
+})();
+
+// ============ 漂浮玫瑰 ============
+(function(){
+    for(let i=0;i<50;i++){
+        const r=document.createElement("div");
+        r.className="rose";
+        const span=document.createElement("span");
+        span.innerHTML="<b>🌹</b>";
+        span.style.fontSize=(20+Math.random()*26)+"px";
+        r.appendChild(span);
+        r.style.left=(2+Math.random()*94)+"%";
+        r.style.setProperty("--rot",((Math.random()-.5)*120)+"deg");
+        const dur=9+Math.random()*7;
+        r.style.animationDuration=dur+"s";
+        r.style.animationDelay=(-Math.random()*dur)+"s";
+        span.style.animationDuration=(2.4+Math.random()*1.8)+"s";
+        document.body.appendChild(r);
+    }
+})();
+
+// ============ 流动粒子爱心 (替换为 1.html 的爱心) ============
+(function(){
+    const canvas=document.getElementById("heart");
+    const ctx=canvas.getContext("2d");
+    const DPR=Math.min(window.devicePixelRatio||1,2);
+    let W,H,CX,CY,S,SCALE;
+
+    // 爱心粒子容器
+    let heartParticles=[];
+
+    function resize(){
+        W=innerWidth;
+        H=innerHeight;
+        canvas.width=Math.floor(W*DPR);
+        canvas.height=Math.floor(H*DPR);
+        canvas.style.width=W+"px";
+        canvas.style.height=H+"px";
+        ctx.setTransform(DPR,0,0,DPR,0,0);
+        CX=W/2;
+        CY=H*0.39;
+        SCALE=Math.min(W,H)*0.018;
+        S=Math.min(W,H)/44;
+        createHeart();
+    }
+    resize();
+    addEventListener("resize",resize);
+
+    // 心形方程(来自 1.html)
+    function heartEquation(t){
+        return {
+            x:16*Math.pow(Math.sin(t),3),
+            y:-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))
+        };
+    }
+
+    // 预渲染发光粒子贴图(硬核心+小光晕,保证清晰)
+    function makeSprite(r,g,b){
+        const c=document.createElement("canvas");
+        c.width=c.height=64;
+        const q=c.getContext("2d");
+        const grd=q.createRadialGradient(32,32,0,32,32,32);
+        grd.addColorStop(0,"rgba(255,255,255,1)");
+        grd.addColorStop(0.28,"rgba("+r+","+g+","+b+",1)");
+        grd.addColorStop(0.5,"rgba("+r+","+g+","+b+",0.28)");
+        grd.addColorStop(0.72,"rgba("+r+","+g+","+b+",0.07)");
+        grd.addColorStop(1,"rgba("+r+","+g+","+b+",0)");
+        q.fillStyle=grd;
+        q.fillRect(0,0,64,64);
+        return c;
+    }
+    const sprites=[
+        makeSprite(255,40,110),   // 玫红
+        makeSprite(255,80,150),   // 亮粉
+        makeSprite(255,125,185),  // 粉
+        makeSprite(255,175,215),  // 浅粉
+        makeSprite(255,230,242)   // 近白
+    ];
+    const whiteSprite=makeSprite(255,255,255);
+    function pickSprite(){
+        const r=Math.random();
+        if(r<0.30)return 0;
+        if(r<0.62)return 1;
+        if(r<0.85)return 2;
+        if(r<0.96)return 3;
+        return 4;
+    }
+
+    // 爱心粒子:沿轮廓流动、向内部扩散(来自 1.html)
+    function createHeart(){
+        heartParticles=[];
+        const count=W*H>900000?2400:1600;
+        for(let i=0;i<count;i++){
+            heartParticles.push({
+                t:Math.random()*Math.PI*2,
+                fill:Math.pow(Math.random(),0.55),
+                size:0.6+Math.random()*1.5,
+                phase:Math.random()*Math.PI*2,
+                speed:0.003+Math.random()*0.006,
+                alpha:0.3+Math.random()*0.7
+            });
+        }
+    }
+
+    // 爱心外圈散落粒子(来自 1.html)
+    const heartDust=[];
+    for(let i=0;i<700;i++){
+        heartDust.push({
+            angle:Math.random()*Math.PI*2,
+            radius:130+Math.random()*130,
+            speed:0.0005+Math.random()*0.0015,
+            size:0.3+Math.random()*1.2,
+            alpha:0.15+Math.random()*0.5,
+            phase:Math.random()*Math.PI*2
+        });
+    }
+
+    // 从爱心上飘散的碎光
+    const sparks=[];
+
+    // 鼠标点击爆发(与 1.html 完全一致:实心圆点,粉/白配色)
+    function burst(x,y){
+        for(let i=0;i<120;i++){
+            const angle=Math.random()*Math.PI*2;
+            const speed=1+Math.random()*4;
+            sparks.push({
+                x:x,
+                y:y,
+                vx:Math.cos(angle)*speed,
+                vy:Math.sin(angle)*speed,
+                life:1,
+                g:0.015,
+                decay:0.008,
+                size:0.5+Math.random()*2,
+                color:Math.random()>0.35?"255,30,180":"255,255,255"
+            });
+        }
+    }
+    addEventListener("click",e=>{
+        burst(e.clientX,e.clientY);
+    });
+
+    // 在屏幕随机位置自动触发点击效果
+    (function randomClick(){
+        burst(
+            (0.03+Math.random()*0.9)*innerWidth,
+            (0.02+Math.random()*0.9)*innerHeight
+        );
+        setTimeout(randomClick,300+Math.random()*500);
+    })();
+
+    let time=0; // 与 1.html 相同:每帧固定步进 0.016
+    function frame(now){
+        requestAnimationFrame(frame);
+        time+=0.016;
+        // 黑色拖影(来自 1.html;destination-out 等效半透明黑幕且保持画布透明)
+        ctx.globalCompositeOperation="destination-out";
+        ctx.fillStyle="rgba(0,0,0,0.18)";
+        ctx.fillRect(0,0,W,H);
+        ctx.globalCompositeOperation="lighter";
+
+        // 心跳脉动(来自 1.html)
+        const beat=1+Math.sin(time*2.8)*0.025;
+        const pulse=beat;
+
+        ctx.globalCompositeOperation="source-over";
+
+        // 外圈散落粒子环
+        for(const p of heartDust){
+            p.angle+=p.speed;
+            p.phase+=0.01;
+            const x=CX+Math.cos(p.angle)*p.radius;
+            const y=CY+Math.sin(p.angle)*p.radius*0.7;
+            const a=p.alpha*(0.5+Math.sin(p.phase)*0.5);
+            if(a<0.02)continue;
+            ctx.beginPath();
+            ctx.fillStyle="rgba(255,100,210,"+a+")";
+            ctx.arc(x,y,p.size,0,Math.PI*2);
+            ctx.fill();
+        }
+
+        // 爱心主体:流动粒子
+        ctx.shadowColor="rgba(255,0,150,.8)";
+        ctx.shadowBlur=8;
+        for(const p of heartParticles){
+            p.t+=p.speed;
+            if(p.t>Math.PI*2)p.t-=Math.PI*2;
+            p.phase+=0.03;
+            const e=heartEquation(p.t);
+            let x=e.x*SCALE*p.fill;
+            let y=e.y*SCALE*p.fill;
+            x+=Math.sin(p.phase+p.t*4)*1.2;
+            y+=Math.cos(p.phase+p.t*3)*1.2;
+            x*=pulse;
+            y*=pulse;
+            const a=p.alpha*(0.65+Math.sin(p.phase)*0.35);
+            ctx.beginPath();
+            ctx.fillStyle="rgba(255,35,155,"+a+")";
+            ctx.arc(CX+x,CY+y,p.size,0,Math.PI*2);
+            ctx.fill();
+        }
+        ctx.shadowBlur=0;
+
+        ctx.globalCompositeOperation="lighter";
+
+        // 生成并绘制飘散碎光
+        if(sparks.length<220&&Math.random()<0.4){
+            const hp=heartParticles[(Math.random()*heartParticles.length)|0];
+            const e=heartEquation(hp.t);
+            const ang=Math.random()*Math.PI*2;
+            const sp=0.25+Math.random()*0.7;
+            sparks.push({
+                x:CX+e.x*SCALE*hp.fill*pulse,
+                y:CY+e.y*SCALE*hp.fill*pulse,
+                vx:Math.cos(ang)*sp,
+                vy:Math.sin(ang)*sp-0.15,
+                life:1,
+                decay:0.004+Math.random()*0.006,
+                size:2+Math.random()*4,
+                sp:Math.random()<0.5?3:4
+            });
+        }
+        for(let i=sparks.length-1;i>=0;i--){
+            const s=sparks[i];
+            s.x+=s.vx;
+            s.y+=s.vy;
+            s.vy+=(s.g||0.002);
+            s.life-=s.decay;
+            if(s.life<=0){sparks.splice(i,1);continue}
+            if(s.color){
+                // 点击爆发:与 1.html drawSparks 相同,实心圆点、透明度=life
+                ctx.globalCompositeOperation="source-over";
+                ctx.globalAlpha=1;
+                ctx.beginPath();
+                ctx.fillStyle="rgba("+s.color+","+s.life+")";
+                ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
+                ctx.fill();
+                ctx.globalCompositeOperation="lighter";
+            }else{
+                ctx.globalAlpha=s.life*0.7;
+                ctx.drawImage(sprites[s.sp],s.x-s.size,s.y-s.size,s.size*2,s.size*2);
+            }
+        }
+        ctx.globalAlpha=1;
+    }
+    requestAnimationFrame(frame);
+})();
+
+// ============ 粒子旋涡 (独立画布,无拖影保持清晰) ============
+(function(){
+    const canvas=document.getElementById("vortexCanvas");
+    const ctx=canvas.getContext("2d");
+    const DPR=Math.min(window.devicePixelRatio||1,2);
+    let W,H,CX,CY,S;
+
+    function resize(){
+        W=innerWidth;
+        H=innerHeight;
+        canvas.width=Math.floor(W*DPR);
+        canvas.height=Math.floor(H*DPR);
+        canvas.style.width=W+"px";
+        canvas.style.height=H+"px";
+        ctx.setTransform(DPR,0,0,DPR,0,0);
+        CX=W/2;
+        CY=H*0.39;
+        S=Math.min(W,H)/44;
+    }
+    resize();
+    addEventListener("resize",resize);
+
+    function makeSprite(r,g,b){
+        const c=document.createElement("canvas");
+        c.width=c.height=64;
+        const q=c.getContext("2d");
+        const grd=q.createRadialGradient(32,32,0,32,32,32);
+        grd.addColorStop(0,"rgba(255,255,255,1)");
+        grd.addColorStop(0.28,"rgba("+r+","+g+","+b+",1)");
+        grd.addColorStop(0.5,"rgba("+r+","+g+","+b+",0.28)");
+        grd.addColorStop(0.72,"rgba("+r+","+g+","+b+",0.07)");
+        grd.addColorStop(1,"rgba("+r+","+g+","+b+",0)");
+        q.fillStyle=grd;
+        q.fillRect(0,0,64,64);
+        return c;
+    }
+    const sprites=[
+        makeSprite(255,40,110),
+        makeSprite(255,80,150),
+        makeSprite(255,125,185),
+        makeSprite(255,175,215),
+        makeSprite(255,230,242)
+    ];
+    function pickSprite(){
+        const r=Math.random();
+        if(r<0.30)return 0;
+        if(r<0.62)return 1;
+        if(r<0.85)return 2;
+        if(r<0.96)return 3;
+        return 4;
+    }
+
+    // 漏斗状螺旋盘
+    const vortex=[];
+    for(let i=0;i<600;i++){
+        const r=2.5+Math.pow(Math.random(),0.65)*21;
+        vortex.push({
+            r:r,
+            ang0:Math.random()*Math.PI*2,
+            yOff:1+r*0.38+(Math.random()-.5)*2.5, // 越靠外越低,形成漏斗
+            speed:0.9/(0.5+r*0.14),               // 内圈转得快
+            size:0.6+Math.random()*1.1,
+            sp:pickSprite(),
+            a:0.25+Math.random()*0.55,
+            tw:1+Math.random()*3,
+            ph:Math.random()*Math.PI*2
+        });
+    }
+
+    const CAM=60; // 相机距离(心形单位)
+    let time=0;   // 与爱心相同的时间步进,保持脉动同步
+    function frame(){
+        requestAnimationFrame(frame);
+        time+=0.016;
+        const beat=1+Math.sin(time*2.8)*0.025; // 与心跳同步
+        ctx.clearRect(0,0,W,H);
+        ctx.globalCompositeOperation="lighter";
+
+        const VY=CY+16*S*beat;
+        for(const v of vortex){
+            const ang=v.ang0+time*v.speed+v.r*0.32; // 自转+螺旋臂扭曲
+            const x=v.r*Math.cos(ang);
+            const z=v.r*Math.sin(ang);
+            const k=CAM/(CAM+z);
+            const sc=k*S*beat;
+            const px=CX+x*sc;
+            const py=VY+(v.yOff+z*0.42)*sc; // z分量压出椭圆透视面
+            const tw=0.6+0.4*Math.sin(time*v.tw+v.ph);
+            const a=v.a*tw*k;
+            if(a<0.02)continue;
+            const d=v.size*S*0.55*k;
+            ctx.globalAlpha=a;
+            ctx.drawImage(sprites[v.sp],px-d,py-d,d*2,d*2);
+        }
+        ctx.globalAlpha=1;
+    }
+    requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
